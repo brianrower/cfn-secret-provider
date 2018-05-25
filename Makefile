@@ -116,7 +116,8 @@ deploy-provider: target/$(NAME)-$(VERSION).zip
                 --template-body file://cloudformation/cfn-resource-provider.yaml \
                 --parameters \
                         ParameterKey=S3BucketPrefix,ParameterValue=$(S3_BUCKET_PREFIX) \
-                        ParameterKey=CFNCustomProviderZipFileName,ParameterValue=lambdas/$(NAME)-$(VERSION).zip
+                        ParameterKey=CFNCustomProviderZipFileName,ParameterValue=lambdas/$(NAME)-$(VERSION).zip\
+                        ParameterKey=FunctionName,ParameterValue=$(LAMBDA_NAME)
 	aws cloudformation wait stack-$(COMMAND)-complete  --stack-name $(NAME)
 
 delete-provider:
