@@ -1,8 +1,7 @@
 include Makefile.mk
+include Makefile.user
 
 NAME=cfn-secret-provider
-S3_BUCKET_PREFIX=binxio-public
-AWS_REGION=eu-central-1
 ALL_REGIONS=$(shell printf "import boto3\nprint('\\\n'.join(map(lambda r: r['RegionName'], boto3.client('ec2').describe_regions()['Regions'])))\n" | python | grep -v '^$(AWS_REGION)$$')
 
 help:
@@ -15,13 +14,15 @@ help:
 	@echo 'make demo            - deploys the provider and the demo cloudformation stack.'
 	@echo 'make delete-demo     - deletes the demo cloudformation stack.'
 
-deploy: target/$(NAME)-$(VERSION).zip
+deploy-s3:
 	aws s3 --region $(AWS_REGION) \
 		cp target/$(NAME)-$(VERSION).zip \
 		s3://$(S3_BUCKET_PREFIX)-$(AWS_REGION)/lambdas/$(NAME)-$(VERSION).zip
 	aws s3 --region $(AWS_REGION) cp \
 		s3://$(S3_BUCKET_PREFIX)-$(AWS_REGION)/lambdas/$(NAME)-$(VERSION).zip \
 		s3://$(S3_BUCKET_PREFIX)-$(AWS_REGION)/lambdas/$(NAME)-latest.zip
+
+deploy-make-public:
 	aws s3api --region $(AWS_REGION) \
 		put-object-acl --bucket $(S3_BUCKET_PREFIX)-$(AWS_REGION) \
 		--acl public-read --key lambdas/$(NAME)-$(VERSION).zip
@@ -29,7 +30,15 @@ deploy: target/$(NAME)-$(VERSION).zip
 		put-object-acl --bucket $(S3_BUCKET_PREFIX)-$(AWS_REGION) \
 		--acl public-read --key lambdas/$(NAME)-latest.zip
 
-deploy-all-regions: deploy
+
+ifeq ($(PUBLIC), True)
+deploy: target/$(NAME)-$(VERSION).zip deploy-s3 deploy-make-public
+else
+deploy: target/$(NAME)-$(VERSION).zip deploy-s3
+endif
+
+
+deploy-all-region-s3: deploy
 	@for REGION in $(ALL_REGIONS); do \
 		echo "copying to region $$REGION.." ; \
 		aws s3 --region $(AWS_REGION) \
@@ -40,6 +49,10 @@ deploy-all-regions: deploy
 			cp  \
 			s3://$(S3_BUCKET_PREFIX)-$$REGION/lambdas/$(NAME)-$(VERSION).zip \
 			s3://$(S3_BUCKET_PREFIX)-$$REGION/lambdas/$(NAME)-latest.zip; \
+	done
+
+deploy-all-regions-make-public:
+	@for REGION in $(ALL_REGIONS); do \
 		aws s3api --region $$REGION \
 			put-object-acl --bucket $(S3_BUCKET_PREFIX)-$$REGION \
 			--acl public-read --key lambdas/$(NAME)-$(VERSION).zip; \
@@ -47,7 +60,12 @@ deploy-all-regions: deploy
 			put-object-acl --bucket $(S3_BUCKET_PREFIX)-$$REGION \
 			--acl public-read --key lambdas/$(NAME)-latest.zip; \
 	done
-		
+
+ifeq ($(PUBLIC), True)
+deploy-all-regions: deploy-all-region-s3 deploy-all-regions-make-public
+else
+deploy-all-regions: deploy-all-region-s3
+endif
 
 undeploy:
 	@for REGION in $(ALL_REGIONS); do \
@@ -98,7 +116,8 @@ deploy-provider: target/$(NAME)-$(VERSION).zip
                 --template-body file://cloudformation/cfn-resource-provider.yaml \
                 --parameters \
                         ParameterKey=S3BucketPrefix,ParameterValue=$(S3_BUCKET_PREFIX) \
-                        ParameterKey=CFNCustomProviderZipFileName,ParameterValue=lambdas/$(NAME)-$(VERSION).zip
+                        ParameterKey=CFNCustomProviderZipFileName,ParameterValue=lambdas/$(NAME)-$(VERSION).zip\
+                        ParameterKey=FunctionName,ParameterValue=$(LAMBDA_NAME)
 	aws cloudformation wait stack-$(COMMAND)-complete  --stack-name $(NAME)
 
 delete-provider:
