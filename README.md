@@ -1,4 +1,13 @@
 # cfn-secret-provider
+
+## FORKED
+This repo is forked from  [binxio/cfn-resource-provider](https://github.com/binxio/cfn-resource-provider) to support:
+* Deploying the secret provider into your account entirely from code under your control (rather than deploying from the prebuilt binxio-public s3 bucket)
+* Support for Secrets Manager secrets rotation
+I will work to get these changes merged upstream.
+
+-----------------------------------------------------------------------------------------------------------------------
+
 A CloudFormation custom resource provider for managing secrets, private keys and EC2 key pairs.
 
 One of the biggest problems I encounter in creating immutable infrastructures, is dealing with secrets. Secrets must always be different per
