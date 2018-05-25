@@ -81,3 +81,8 @@ Outputs:
     Description: ARN of the IAM Role which the custom CFN provider will execute as
     Export:
       Name: !Sub "${AWS::StackName}-RoleARN"
+  ProviderLambdaARN:
+    Value: !GetAtt CFNSecretProvider.Arn
+    Description: ARN of the provider lambda. Use this value in the 'ServiceToken' property to use this provider
+    Export:
+      Name: !Sub "${AWS::StackName}-ARN"
