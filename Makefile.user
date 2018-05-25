@@ -1,0 +1,3 @@
+S3_BUCKET_PREFIX=<your bucket prefix here, e.g. 'my-custom-cloud-formation-bucket>
+AWS_REGION=<your aws region here, e.g. 'us-west-2'>
+PUBLIC=False # True if you want the Lambda zip package public read to the world False if you don't
