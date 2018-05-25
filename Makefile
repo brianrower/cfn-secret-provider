@@ -109,7 +109,7 @@ autopep:
 
 deploy-provider: COMMAND=$(shell if aws cloudformation get-template-summary --stack-name $(NAME) >/dev/null 2>&1; then \
 			echo update; else echo create; fi)
-deploy-provider: target/$(NAME)-$(VERSION).zip
+deploy-provider: deploy
 	aws cloudformation $(COMMAND)-stack \
                 --capabilities CAPABILITY_IAM \
                 --stack-name $(NAME) \
