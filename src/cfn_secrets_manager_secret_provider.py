@@ -43,6 +43,10 @@ request_schema = {
         "ClientRequestToken": {"type": "string",
                                "description": "a unique identifier for the new version to ensure idempotency"},
         "NoEcho": {"type": "boolean", "default": True, "description": "the secret as output parameter"},
+        "LambdaARN": {"type": "string", "description": "The Lambda used to rotate this secret"},
+        "Interval": {"type": "integer", "minimum": 1, "maximum": 365,
+                     "default": 30,
+                     "description": "Number of days between secret rotations, max: 365"},
         "Tags": {
             "type": "array",
             "items": {
@@ -74,6 +78,8 @@ class SecretsManagerSecretProvider(ResourceProvider):
                 self.properties['NoEcho'] = (self.properties['NoEcho'] == 'true')
             if 'RecoveryWindowInDays' in self.properties:
                 self.properties['RecoveryWindowInDays'] = int(self.properties['RecoveryWindowInDays'])
+            if 'Interval' in self.properties:
+                self.properties['Interval'] = int(self.properties['Interval'])
         except ValueError as e:
             log.error('failed to convert property types %s', e)
 
@@ -95,15 +101,26 @@ class SecretsManagerSecretProvider(ResourceProvider):
         return args
 
     def set_return_attributes(self, response):
-        self.set_attribute('VersionId', response['VersionId'])
         self.physical_resource_id = response['ARN']
         self.no_echo = self.get('NoEcho')
+
+    def set_rotation_config(self):
+        if self.get('LambdaARN') and self.get('Interval'):
+            args = {
+                'SecretId': self.get('Name'),
+                'RotationLambdaARN': self.get('LambdaARN'),
+                'RotationRules': {
+                    'AutomaticallyAfterDays': self.get('Interval')
+                }
+            }
+            self.sm.rotate_secret(**args)
 
     def create(self):
         try:
             args = self.create_arguments()
             response = self.sm.create_secret(**args)
             self.set_return_attributes(response)
+            self.set_rotation_config()
         except ClientError as e:
             self.physical_resource_id = 'could-not-create'
             self.fail('{}'.format(e))
@@ -117,10 +134,13 @@ class SecretsManagerSecretProvider(ResourceProvider):
             args = self.create_arguments()
             args['SecretId'] = self.physical_resource_id
             del args['Name']
-            del args['Tags']
+            if 'Tags' in args:
+                del args['Tags']
 
             response = self.sm.update_secret(**args)
             self.set_return_attributes(response)
+
+            self.set_rotation_config()
 
             if self.get_old('Tags', self.get('Tags')) != self.get('Tags'):
                 if len(self.get_old('Tags')) > 0:
